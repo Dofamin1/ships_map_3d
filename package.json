@@ -1,0 +1,23 @@
+{
+  "name": "ships_map_3d",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Dofamin1/ships_map_3d.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Dofamin1/ships_map_3d/issues"
+  },
+  "homepage": "https://github.com/Dofamin1/ships_map_3d#readme",
+  "dependencies": {
+    "express": "^4.17.1"
+  }
+}
