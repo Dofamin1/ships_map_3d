@@ -3,13 +3,15 @@ import Stats from 'https://cdn.skypack.dev/three/examples/jsm/libs/stats.module.
 
 import { FirstPersonControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/FirstPersonControls.js';
 import { ImprovedNoise } from 'https://cdn.skypack.dev/three/examples/jsm/math/ImprovedNoise.js';
+import { OBJLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/OBJLoader.js';
 
 let container, stats;
 let camera, controls, scene, renderer;
 let mesh, texture;
 
-const worldWidth = 256, worldDepth = 256;
+const worldWidth = 512, worldDepth = 512;
 const clock = new THREE.Clock();
+const SUBMARINES_DATA = [{ x: 1000, y: 1000, z: 1000 }, { x: 1500, y: 800, z: 1000 }, { x: 500, y: 1800, z: 4000 }];
 
 init();
 animate();
@@ -21,13 +23,13 @@ function init() {
     camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 10000 );
 
     scene = new THREE.Scene();
-    scene.fog = new THREE.FogExp2( 0x1376ad, 0.0001 );
-    scene.background = new THREE.Color( 0x1376ad );
+    scene.fog = new THREE.FogExp2( 0x5dc7fc, 0.0001 );
+    scene.background = new THREE.Color( 0x5dc7fc );
 
     const data = generateHeight( worldWidth, worldDepth );
 
-    camera.position.set( 100, 1200, - 800 );
-    camera.lookAt( - 100, 810, - 800 );
+    camera.position.set( - 1000, 1000, - 1400 );
+    camera.lookAt( 100, 1010, 2300 );
 
     const geometry = new THREE.PlaneGeometry( 15000, 15000, worldWidth - 1, worldDepth - 1 );
     geometry.rotateX( - Math.PI / 2 );
@@ -44,7 +46,7 @@ function init() {
     texture.wrapS = THREE.ClampToEdgeWrapping;
     texture.wrapT = THREE.ClampToEdgeWrapping;
 
-    mesh = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { map: texture } ) );
+    mesh = new THREE.Mesh( geometry, new THREE.MeshBasicMaterial( { map: texture, color: 0x1376ad } ) );
     scene.add( mesh );
 
     renderer = new THREE.WebGLRenderer();
@@ -53,14 +55,29 @@ function init() {
     container.appendChild( renderer.domElement );
 
     controls = new FirstPersonControls( camera, renderer.domElement );
-    controls.movementSpeed = 450;
+    controls.movementSpeed = 850;
     controls.lookSpeed = 0.1;
+
+    SUBMARINES_DATA.forEach(sub => addSubmarine({ x: sub.x, y: sub.y, z: sub.z }))
 
     stats = new Stats();
     container.appendChild( stats.dom );
 
-
     window.addEventListener('resize', onWindowResize );
+}
+
+function addSubmarine({ x, y, z }) {
+    const objLoader = new OBJLoader();
+    objLoader.load('/models/submarine/uploads_files_989493_submarine.obj', (root) => {
+        const arrowHelper = new THREE.ArrowHelper( new THREE.Vector3( x, y, z ), new THREE.Vector3( x, 0, z), 20000, 0x48ff00, 0, 0 );
+        scene.add( arrowHelper );
+
+        const material = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.4 });
+        root.traverse(node => node.material = material);
+        scene.add(root);
+        root.position.set(x, y, z);
+        root.scale.set( 20, 20, 20 );
+    });
 }
 
 function onWindowResize() {
@@ -182,10 +199,24 @@ function animate() {
 
 }
 
+function resizeRendererToDisplaySize(renderer) {
+    const canvas = renderer.domElement;
+    const width = canvas.clientWidth;
+    const height = canvas.clientHeight;
+    const needResize = canvas.width !== width || canvas.height !== height;
+    if (needResize) {
+      renderer.setSize(width, height, false);
+    }
+    return needResize;
+  }
 
 function render() {
+    if (resizeRendererToDisplaySize(renderer)) {
+        const canvas = renderer.domElement;
+        camera.aspect = canvas.clientWidth / canvas.clientHeight;
+        camera.updateProjectionMatrix();
+      }
 
     controls.update( clock.getDelta() );
     renderer.render( scene, camera );
-
 }
