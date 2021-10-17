@@ -33,6 +33,7 @@ class PickHelper {
     // restore the color if there is a picked object
     if (this.pickedObject) {
       this.pickedObject.material.color.setHex(this.pickedObjectSavedColor);
+      this.pickedObject.material.label.style.display = 'none';
       this.pickedObject = undefined;
     }
  
@@ -45,6 +46,7 @@ class PickHelper {
     if (intersectedObjects.length) {
       // pick the first object. It's the closest one
       this.pickedObject = intersectedObjects[0].object;
+      this.pickedObject.material.label.style.display = 'block';
       // save its color
       this.pickedObjectSavedColor = this.pickedObject.material.color.getHex();
       // set its emissive color to flashing red/yellow

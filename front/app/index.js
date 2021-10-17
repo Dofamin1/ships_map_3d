@@ -2,6 +2,7 @@ import * as THREE from 'https://cdn.skypack.dev/three@0.133.1';
 import Stats from 'https://cdn.skypack.dev/three/examples/jsm/libs/stats.module.js';
 
 import { FirstPersonControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/FirstPersonControls.js';
+// import {OrbitControls} from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls.js';
 import { ImprovedNoise } from 'https://cdn.skypack.dev/three/examples/jsm/math/ImprovedNoise.js';
 import { OBJLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/OBJLoader.js';
 import PickHelper from './PickHelper.js';
@@ -10,20 +11,25 @@ let container, stats;
 let camera, controls, scene, renderer, pickHelper;
 let mesh, texture;
 
+let submarineObjects = [];
+
 const worldWidth = 512, worldDepth = 512;
 const clock = new THREE.Clock();
+const tempV = new THREE.Vector3();
 const SUBMARINES_DATA = [
-    { x: 1000, y: 1000, z: 1000, direction: Math.PI / 2, size: 1 },
-    { x: 1500, y: 800, z: -2000, direction: Math.PI / 4, size: 2  },
-    { x: 500, y: 1800, z: 4000, direction: Math.PI / 6, size: 3  },
-    { x: -2500, y: 1000, z: 4000, direction: Math.PI * 1.5, size: 1  },
-    { x: 3500, y: 1000, z: -1000, direction: Math.PI * 2, size: 2  }
+    { x: 1000, y: 1000, z: 1000, direction: Math.PI / 2, size: 1, speed: 2 },
+    { x: 1500, y: 800, z: -2000, direction: Math.PI / 4, size: 2, speed: 0  },
+    { x: 500, y: 1800, z: 4000, direction: Math.PI / 6, size: 3, speed: 10 },
+    { x: -2500, y: 1000, z: 4000, direction: Math.PI * 1.5, size: 1, speed: 8 },
+    { x: 3500, y: 1000, z: -1000, direction: Math.PI * 2, size: 2, speed: 4 }
 ];
 
-init();
-animate();
+(async () => {
+    await init();
+    animate();
+})();
 
-function init() {
+async function init() {
 
     container = document.getElementById( 'WebGL-output' );
 
@@ -65,8 +71,7 @@ function init() {
     controls.movementSpeed = 850;
     controls.lookSpeed = 0.1;
 
-    SUBMARINES_DATA.forEach(sub => addSubmarine({ x: sub.x, y: sub.y, z: sub.z, direction: sub.direction, size: sub.size }));
-
+    submarineObjects = await Promise.all(SUBMARINES_DATA.map(sub => addSubmarine({ x: sub.x, y: sub.y, z: sub.z, direction: sub.direction, size: sub.size, speed: sub.speed })));
     stats = new Stats();
     container.appendChild( stats.dom );
 
@@ -75,24 +80,37 @@ function init() {
     pickHelper = new PickHelper(renderer);
 }
 
-function addSubmarine({ x, y, z, direction, size }) {
+async function addSubmarine({ x, y, z, direction, size, speed }) {
     const objLoader = new OBJLoader();
-    objLoader.load('/models/submarine/uploads_files_989493_submarine.obj', (root) => {
-        const verticalArrowHelper = new THREE.ArrowHelper( new THREE.Vector3( x, y, z ), new THREE.Vector3( x, 0, z), 20000, 0x48ff00, 0, 0 );
-        const directionArrowHelper = new THREE.ArrowHelper( new THREE.Vector3( x, y, z ), new THREE.Vector3( x, y, z), 1400, 0xeb4034 );
-        directionArrowHelper.rotateY(direction);
-        directionArrowHelper.rotateX(Math.PI / 2);
-        scene.add( verticalArrowHelper );
-        scene.add( directionArrowHelper );
+    return new Promise((res, rej) => {
+        try {
+            objLoader.load('/models/submarine/uploads_files_989493_submarine.obj', (root) => {
+                const verticalArrowHelper = new THREE.ArrowHelper( new THREE.Vector3( x, y, z ), new THREE.Vector3( x, 0, z), 20000, 0x48ff00, 0, 0 );
+                const directionArrowHelper = new THREE.ArrowHelper( new THREE.Vector3( x, y, z ), new THREE.Vector3( x, y, z), 1400, 0xeb4034 );
+                directionArrowHelper.rotateY(direction);
+                directionArrowHelper.rotateX(Math.PI / 2);
+                scene.add( verticalArrowHelper );
+                scene.add( directionArrowHelper );
+        
+                const material = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.4, name: 'submarine' });
+                root.traverse(node => node.material = material);
+                scene.add(root);
+        
+                root.scale.set( 20 * size, 20 * size, 20 * size );
+                root.position.set(x, y, z);
+                root.rotateY(direction);
+    
+                const label = document.createElement('div');
+                label.textContent = `speed: ${speed} \n direction: ${Math.round(direction, 5)} rad`;
+                document.querySelector('#labels').appendChild(label);
+                material.label = label;
 
-        const material = new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0.4, name: 'submarine' });
-        root.traverse(node => node.material = material);
-        scene.add(root);
-
-        root.scale.set( 20 * size, 20 * size, 20 * size );
-        root.position.set(x, y, z);
-        root.rotateY(direction);
-    });
+                res({ submarine: root, label })
+            });
+        } catch(e) {
+            rej(e);
+        }
+    })
 }
 
 function onWindowResize() {
@@ -210,11 +228,24 @@ function resizeRendererToDisplaySize(renderer) {
   }
 
 function render() {
+    const canvas = renderer.domElement;
+
     if (resizeRendererToDisplaySize(renderer)) {
-        const canvas = renderer.domElement;
         camera.aspect = canvas.clientWidth / canvas.clientHeight;
         camera.updateProjectionMatrix();
     }
+
+    submarineObjects.forEach(({ submarine, label }) => {
+        submarine.updateWorldMatrix(true, false);
+        submarine.getWorldPosition(tempV);
+
+        tempV.project(camera);
+
+        const x = (tempV.x *  .5 + .5) * canvas.clientWidth + 40;
+        const y = (tempV.y * -.5 + .5) * canvas.clientHeight + 40;
+
+        label.style.transform = `translate(-50%, -50%) translate(${x}px,${y}px)`;
+    });
 
     pickHelper.pick(scene, camera);
 
